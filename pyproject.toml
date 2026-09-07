@@ -1,0 +1,14 @@
+[project]
+name = "production-ai-agents"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "langchain>=1.4.0",
+    "langchain-anthropic>=1.7.1",
+    "langchain-core>=1.6.2",
+    "langchain-openai>=1.6.0",
+    "langgraph>=1.2.11",
+    "python-dotenv>=1.2.3",
+]
