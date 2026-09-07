@@ -10,8 +10,8 @@ from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 
 
-print(f"Langchain-core version: {core_version}")
-print(f"Langgraph-core version: {lg_version}")
+print(f"Langchain-core version: {core_version}") # 1.6.2
+print(f"Langgraph-core version: {lg_version}") # 1.2.11
 
 
 
