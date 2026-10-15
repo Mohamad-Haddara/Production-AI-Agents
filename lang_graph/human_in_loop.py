@@ -120,12 +120,131 @@ def interrupt_for_approval():
         }
     )
 
-    # Continue execution ~ None mean do not add any new input just continue with execution
+    # Continue execution ~ None mean do not add any new input just continue with execution ~ V.I
     final_result = llm.invoke(None, config)
 
     print(f"\nFinal result:\n {final_result['final']}")
 
 
+# Full Human in the Loop Workflow
+# Iterative Review (Human-in-the-loop + Cycles Combined)
+# Demo 1 is one pause
+# Demo2 is mutliple round of human review (iterative) - but making workflow more complex
+
+class ReviewState(TypedDict):
+    document: str
+    review_comments: list[str]
+    revision_count: int
+    status: str # human control - set revision or human control - that what drive routing
+
+
+def iterative_review():
+    """Multiple rounds of human review."""
+
+    # Add Nodes
+    def submit_for_review(state: ReviewState) -> dict:
+        return {"status":"pending_review"} # document is ready for human review
+
+    # Apply feedback
+    def apply_feedback(state: ReviewState) -> dict:
+
+        if not state["review_comments"]:
+            return state
+        
+        feedback = state["review_comments"][-1]
+        response = llm.invoke(
+            f"Review this document based on feedback\n\n"
+            f"Document: {state["document"]}"
+            f"Feedback: {feedback}"
+        )
+
+        return {
+            "document": response.content,
+            "revision_count" : state["revision_count"] + 1,
+            "status": "revised"
+        }
+
+    
+    # Route
+    def route_after_review(state: ReviewState) -> dict:
+        if state["status"] == "approved":
+            return "done"
+
+        return "apply"
+
+    def finalize(state: ReviewState) -> dict:
+        return {"status": "finalized"}
+
+    
+
+    graph = StateGraph(ReviewState)
+
+    graph.add_node("submit", submit_for_review)
+    graph.add_node("apply_feedback", apply_feedback)
+    graph.add_node("done", finalize)
+    
+
+    graph.add_edge(START, "submit")
+    #graph.add_edge("submit", "apply_feedback")
+    graph.add_conditional_edges(
+        "submit",
+        route_after_review,
+        {
+            "apply" : "apply",
+            "done" : "done"
+        }
+    )
+
+    graph.add_edge("apply", "submit") # Loop for more reviews
+    graph.add_edge("submit", END)
+
+
+    memory = MemorySaver()
+    app = graph.compile(
+        checkpointer=memory,
+        interrupt_before=["submit"]
+    )
+
+    print("Iterative Review:\n")
+
+    config = {"configurable": {"thread_id":"review-1"}}
+
+
+    # Initial submission
+    result = app.invoke({
+        "document": "AI is technolog that helps computers think",
+        "review_comments": [],
+        "revision_count": 0,
+        "status":""
+    }, config)
+
+
+    print(f"Initial document: {result['document']}")
+    print("[Waiting for review...]")
+
+    # Simulate reviewer adding comments
+    # update_state used to inject
+    # invoke(None) used to resume
+    app.update_state(config, {
+        "review_comments": ["Add more technical depth and examples"],
+        "status": "needs_revision"
+    })
+
+    result = app.invoke(None, config)
+    print(f"After revision 1: {result["document"][:150]}...") 
+
+    # Final approval
+    app.update_state(config, {"status": "approved"})
+
+
+    final = app.invoke(None, config)
+    print(f"\nFinal status: {final['status']}")
+    print(f"\nTotal revision: {final['status']}")
+    print(f"\nFinal document: {final['document'][:150]}...")
+
+    # Finaly it is important because we include human feedback (for refinement, revision) in AI agentic until we get correct response
 
 if __name__ == "__main__":
-    interrupt_for_approval()
+    
+    #interrupt_for_approval()
+    iterative_review()
