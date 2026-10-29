@@ -1,5 +1,12 @@
 """
 Complete RAG system with conversation memory
+
+Research Assistant: Advanced retrieval + Memory + Structured Response
+
+Complete RAG pipeline - But I should include document ingestion and pass PDF file (Implement the File Uploader) ~ We should have a function is responsible for uploading documents
+(Extract and put in database) ~ it is a separate component but if I put it in whole rag pipeline, it should work fine.
+
+Fundamental
 """
 
 from importlib import metadata
@@ -278,7 +285,7 @@ class AIResearchAssistant:
             {
                 "context": context,
                 "question": question,
-                "sources": ", ".join(sources),
+                "sources": ",".join(sources),
                 "history": (
                     history.messages[-10:]
                     if hasattr(history, "messages")
@@ -400,6 +407,7 @@ class AIResearchAssistant:
 
 
 
+
 def print_search_response(question:str, response: ResearchResponse):
     """Pretty print a structured research response."""
 
@@ -412,7 +420,13 @@ def print_search_response(question:str, response: ResearchResponse):
     if response.key_quotes:
         print(f"\n  Key Quotes:")
         for q in response.key_quotes:
-            
+            print(f"     - {q}")
+
+    
+    print("\n   Follow-up Questions:")
+    for fq in response.follow_up_questions:
+        print(f"    -{fq}")
+
 
 
 if __name__ == "__main__":
@@ -565,6 +579,71 @@ Evaluation and observability are what separate a demo from a production system. 
     print(f"\nUser (session == 'demo'):     {assistant.ask(q4, 'demo')[:150]}")
     print(f"\nUser (session == 'new'):     {assistant.ask(q4, 'new')[:150]}") # Each session is own isolated instance
     print("\n'new' session has no idea -- different memory")
+
+
+
+
+
+    print("="*60)
+
+    question = "What is RAG and what are its benefits?"
+    print("\n--- String response (ask) ---")
+    string_response = assistant.ask(question, "string_test")
+
+
+    print("\n--- Structured response (ask_structured)   ---")
+    structured_response = assistant.ask_structured(question, "struct_test")
+    print(f"Type: {type(structured_response)}")
+    print(f"Answer:      {structured_response.answer[:100]}...")
+    print(f"confidence:     {structured_response.confidence}")
+    print(f"Source:      {structured_response.sources}")
+    print(f"key_quotes:     {structured_response.key_quotes[:2]}")
+    print(f"follow_up_questions:    {structured_response.follow_up_questions}")
+
+
+    # --- Step 2: Access fields directly ---
+    print("\n" + "=" * 60)
+    print("STEP 2: Use fields in our code")
+    print("="*60)
+
+
+    r = assistant.ask_structured("What is the attention mechanism?", session)
+
+    # This is what our app code looks like
+    if r.confidence == "high":
+        print(f"\n  Confident answer from: {r.sources}")
+    
+    else:
+        print(f"\n  Low confidence -- may need more sources")
+
+
+    print(f"\n Answer: {r.answer[:200]}")
+
+
+    # --- Step 3: Multi-turn with structured output ---
+    print("\n" + "=" *60)
+    print("STEP 3: Memory works with structured output too")
+    print("="*60)
+
+    q1 = "What are the components of RAG?"
+    print(f"\nUser: {q1}")
+    r1 = assistant.ask_structured(q1, session)
+    print_search_response(q1, r1)
+
+    q2 = "How does the second component work?"
+    print(f"\n{'-'*30}")
+    print(f"\nUser: {q2}")
+    r2 = assistant.ask_structured(q2, session)
+    print_search_response(q2, r2)
+
+
+    q3 = "Connect everything we discussed to LangChain"
+    print(f"\n{'-'*30}")
+    print(f"\nUser: {q2}")
+    r3 = assistant.ask_structured(q3, session)
+    print_search_response(q3, r3)
+
+
 
     # Bonus: Show the persist directory exists on disk
     import os
